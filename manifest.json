@@ -1,0 +1,35 @@
+{
+  "name": "Pronote Plus",
+  "short_name": "Pronote+",
+  "description": "Calcule ta vraie moyenne, te dit où bosser en priorité.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#080e14",
+  "theme_color": "#0f1923",
+  "orientation": "portrait",
+  "icons": [
+    {
+      "src": "icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ],
+  "share_target": {
+    "action": "/",
+    "method": "GET",
+    "params": {
+      "title": "title",
+      "text": "text",
+      "url": "url"
+    }
+  },
+  "categories": ["education", "utilities"],
+  "lang": "fr"
+}
