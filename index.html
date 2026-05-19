@@ -1,0 +1,872 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <title>Pronote Plus</title>
+  <meta name="description" content="Calcule ta vraie moyenne, te dit où bosser en priorité.">
+
+  <!-- PWA -->
+  <link rel="manifest" href="manifest.json">
+  <meta name="theme-color" content="#0f1923">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Pronote+">
+  <link rel="apple-touch-icon" href="icon-192.png">
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Syne:wght@700;800&family=DM+Mono:wght@400;500&family=DM+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+
+  <style>
+    :root {
+      --bg: #080e14;
+      --surface: #0f1923;
+      --surface2: #0d2137;
+      --border: #1e3a5f;
+      --accent: #00b894;
+      --accent2: #74b9ff;
+      --accent3: #a29bfe;
+      --text: #cdd6f4;
+      --muted: #4a6fa5;
+      --danger: #e17055;
+    }
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    html { scroll-behavior: smooth; }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: 'DM Sans', system-ui, sans-serif;
+      min-height: 100vh;
+      overflow-x: hidden;
+    }
+
+    /* NOISE OVERLAY */
+    body::before {
+      content: '';
+      position: fixed;
+      inset: 0;
+      background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.04'/%3E%3C/svg%3E");
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    /* GRID BG */
+    body::after {
+      content: '';
+      position: fixed;
+      inset: 0;
+      background-image:
+        linear-gradient(var(--border) 1px, transparent 1px),
+        linear-gradient(90deg, var(--border) 1px, transparent 1px);
+      background-size: 40px 40px;
+      opacity: 0.15;
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    .glow {
+      position: fixed;
+      width: 600px; height: 600px;
+      border-radius: 50%;
+      filter: blur(120px);
+      pointer-events: none;
+      z-index: 0;
+    }
+    .glow-1 { background: #00b89415; top: -200px; right: -100px; }
+    .glow-2 { background: #74b9ff08; bottom: -200px; left: -100px; }
+
+    /* LAYOUT */
+    .wrap { position: relative; z-index: 1; max-width: 860px; margin: 0 auto; padding: 0 24px; }
+
+    /* NAV */
+    nav {
+      position: sticky; top: 0; z-index: 100;
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+      border-bottom: 1px solid var(--border);
+      background: rgba(8,14,20,0.8);
+    }
+    nav .wrap { display: flex; align-items: center; justify-content: space-between; padding-top: 16px; padding-bottom: 16px; }
+    .nav-logo { font-family: 'Syne', sans-serif; font-weight: 800; font-size: 18px; color: var(--accent); letter-spacing: 2px; }
+    .nav-logo span { color: var(--muted); }
+    .nav-badge {
+      font-family: 'DM Mono', monospace;
+      font-size: 10px; font-weight: 500;
+      background: #00b89415; color: var(--accent);
+      border: 1px solid #00b89440;
+      border-radius: 20px; padding: 4px 12px;
+      letter-spacing: 1px;
+    }
+
+    /* HERO */
+    .hero { padding: 80px 0 60px; text-align: center; }
+    .hero-tag {
+      display: inline-block;
+      font-family: 'DM Mono', monospace;
+      font-size: 11px; letter-spacing: 3px;
+      color: var(--accent); text-transform: uppercase;
+      border: 1px solid #00b89440;
+      background: #00b89410;
+      border-radius: 20px; padding: 6px 18px;
+      margin-bottom: 32px;
+      animation: fadeUp 0.6s ease both;
+    }
+    .hero h1 {
+      font-family: 'Syne', sans-serif;
+      font-size: clamp(48px, 10vw, 88px);
+      font-weight: 800;
+      line-height: 0.95;
+      letter-spacing: -3px;
+      color: #fff;
+      animation: fadeUp 0.6s 0.1s ease both;
+    }
+    .hero h1 em { color: var(--accent); font-style: normal; }
+    .hero-sub {
+      font-size: 18px; color: var(--muted);
+      max-width: 480px; margin: 24px auto 0;
+      line-height: 1.7;
+      animation: fadeUp 0.6s 0.2s ease both;
+    }
+    .hero-sub strong { color: var(--text); }
+
+    /* CARDS FEATURES */
+    .features {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 16px;
+      margin: 60px 0;
+      animation: fadeUp 0.6s 0.3s ease both;
+    }
+    @media (max-width: 500px) { .features { grid-template-columns: 1fr; } }
+    .feat-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 24px;
+      transition: border-color 0.2s, transform 0.2s;
+    }
+    .feat-card:hover { border-color: var(--accent); transform: translateY(-2px); }
+    .feat-icon { font-size: 28px; margin-bottom: 12px; }
+    .feat-title { font-family: 'Syne', sans-serif; font-size: 15px; font-weight: 700; color: #fff; margin-bottom: 6px; }
+    .feat-desc { font-size: 13px; color: var(--muted); line-height: 1.6; }
+
+    /* DIVIDER */
+    .section-title {
+      font-family: 'Syne', sans-serif;
+      font-size: 13px; font-weight: 700;
+      letter-spacing: 3px; text-transform: uppercase;
+      color: var(--muted);
+      margin-bottom: 24px;
+    }
+    .section-title::before { content: '—  '; color: var(--accent); }
+
+    /* INSTALL TABS */
+    .install-section { margin: 0 0 80px; }
+    .tabs {
+      display: flex; gap: 4px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 4px;
+      margin-bottom: 24px;
+    }
+    .tab-btn {
+      flex: 1; padding: 10px;
+      background: transparent; border: none;
+      border-radius: 9px;
+      color: var(--muted);
+      font-family: 'DM Sans', sans-serif;
+      font-size: 13px; font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .tab-btn.active { background: var(--surface2); color: var(--accent); }
+
+    .tab-pane { display: none; }
+    .tab-pane.active { display: block; }
+
+    .install-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 28px;
+    }
+    .step {
+      display: flex; gap: 16px;
+      margin-bottom: 20px;
+      align-items: flex-start;
+    }
+    .step:last-child { margin-bottom: 0; }
+    .step-num {
+      width: 28px; height: 28px; flex-shrink: 0;
+      border-radius: 50%;
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      display: flex; align-items: center; justify-content: center;
+      font-family: 'DM Mono', monospace;
+      font-size: 11px; font-weight: 500;
+      color: var(--accent);
+    }
+    .step-body { flex: 1; }
+    .step-title { font-size: 14px; font-weight: 600; color: #fff; margin-bottom: 4px; }
+    .step-desc { font-size: 13px; color: var(--muted); line-height: 1.6; }
+    .step-desc code {
+      font-family: 'DM Mono', monospace;
+      font-size: 11px;
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      padding: 2px 6px;
+      color: var(--accent2);
+    }
+
+    /* BOOKMARKLET BUTTON */
+    .bm-wrap {
+      margin: 16px 0;
+      display: flex; align-items: center; gap: 12px;
+      flex-wrap: wrap;
+    }
+    #bm-btn {
+      display: inline-flex; align-items: center; gap: 8px;
+      background: var(--accent);
+      color: #0f1923;
+      font-family: 'DM Mono', monospace;
+      font-size: 13px; font-weight: 500;
+      border-radius: 10px;
+      padding: 10px 18px;
+      border: none;
+      cursor: grab;
+      user-select: none;
+      text-decoration: none;
+      box-shadow: 0 0 20px #00b89430;
+      transition: box-shadow 0.2s;
+    }
+    #bm-btn:hover { box-shadow: 0 0 30px #00b89460; }
+    #bm-btn:active { cursor: grabbing; }
+    .bm-hint { font-size: 12px; color: var(--muted); }
+
+    /* IOS SHARE SECTION */
+    .share-visual {
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 16px;
+      margin: 12px 0;
+      display: flex; align-items: center; gap: 12px;
+    }
+    .share-icon { font-size: 32px; }
+    .share-text { font-size: 13px; color: var(--muted); line-height: 1.6; }
+    .share-text strong { color: var(--text); }
+
+    /* INSTALL BTN PWA */
+    #install-btn {
+      display: none;
+      width: 100%; padding: 14px;
+      background: var(--accent);
+      color: #0f1923;
+      font-family: 'DM Sans', sans-serif;
+      font-size: 14px; font-weight: 700;
+      border: none; border-radius: 10px;
+      cursor: pointer;
+      letter-spacing: 0.5px;
+      margin-top: 16px;
+      -webkit-tap-highlight-color: transparent;
+      box-shadow: 0 0 24px #00b89430;
+    }
+    #install-btn.visible { display: block; }
+
+    /* ALERT */
+    .alert {
+      display: flex; gap: 10px; align-items: flex-start;
+      background: #00b89410; border: 1px solid #00b89430;
+      border-radius: 10px; padding: 12px 16px;
+      font-size: 12px; color: var(--muted);
+      line-height: 1.6; margin-top: 16px;
+    }
+    .alert strong { color: var(--text); }
+
+    /* FAQ */
+    .faq { margin-bottom: 80px; }
+    .faq-item {
+      border-bottom: 1px solid var(--border);
+    }
+    .faq-q {
+      width: 100%; text-align: left;
+      background: transparent; border: none;
+      padding: 18px 0;
+      font-family: 'DM Sans', sans-serif;
+      font-size: 14px; font-weight: 600;
+      color: var(--text);
+      cursor: pointer;
+      display: flex; justify-content: space-between; align-items: center;
+      gap: 12px;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .faq-q .icon { color: var(--muted); font-size: 18px; transition: transform 0.2s; flex-shrink: 0; }
+    .faq-item.open .faq-q .icon { transform: rotate(45deg); color: var(--accent); }
+    .faq-a {
+      font-size: 13px; color: var(--muted); line-height: 1.7;
+      max-height: 0; overflow: hidden;
+      transition: max-height 0.3s ease, padding 0.3s;
+    }
+    .faq-item.open .faq-a { max-height: 300px; padding-bottom: 18px; }
+
+    /* FOOTER */
+    footer {
+      border-top: 1px solid var(--border);
+      padding: 24px 0;
+      text-align: center;
+      font-family: 'DM Mono', monospace;
+      font-size: 11px; color: var(--muted);
+      letter-spacing: 1px;
+    }
+    footer a { color: var(--accent); text-decoration: none; }
+
+    @keyframes fadeUp {
+      from { opacity: 0; transform: translateY(20px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    /* SHARE HANDLER VIEW */
+    #share-handler {
+      display: none;
+      position: fixed; inset: 0; z-index: 200;
+      background: var(--bg);
+      overflow-y: auto;
+      padding: 24px;
+    }
+    #share-handler.active { display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 100vh; }
+    #share-handler h2 { font-family: 'Syne', sans-serif; font-size: 28px; color: #fff; margin-bottom: 8px; }
+    #share-handler p { color: var(--muted); font-size: 14px; margin-bottom: 24px; }
+
+    /* RESULTS PANEL */
+    #results {
+      width: 100%; max-width: 420px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 20px;
+      overflow: hidden;
+    }
+    .res-hd {
+      background: linear-gradient(135deg, #0d2137, #0f1923);
+      border-bottom: 1px solid var(--border);
+      padding: 16px 20px;
+      display: flex; justify-content: space-between; align-items: center;
+    }
+    .res-hd .logo { font-family: 'Syne', sans-serif; font-size: 14px; font-weight: 800; color: var(--accent); letter-spacing: 2px; }
+    .res-body { padding: 20px; }
+    .res-label { font-size: 9px; font-weight: 700; letter-spacing: 2.5px; color: var(--muted); text-transform: uppercase; margin-bottom: 8px; }
+    .res-big { display: flex; align-items: baseline; gap: 6px; margin-bottom: 4px; }
+    .res-big .val { font-family: 'Syne', sans-serif; font-size: 56px; font-weight: 800; color: var(--accent); line-height: 1; letter-spacing: -3px; }
+    .res-big .over { font-size: 20px; color: var(--muted); }
+    .res-big .nb { font-size: 12px; color: var(--muted); align-self: flex-end; padding-bottom: 8px; }
+    .res-divider { height: 1px; background: var(--border); margin: 16px 0; }
+    .res-section-title { font-size: 9px; font-weight: 700; letter-spacing: 2.5px; color: var(--muted); text-transform: uppercase; margin-bottom: 12px; }
+    .prio-item { margin-bottom: 12px; }
+    .prio-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px; }
+    .prio-name { font-size: 12px; color: var(--text); font-weight: 600; }
+    .prio-gain { font-size: 11px; font-weight: 700; }
+    .prio-bar-wrap { flex: 1; height: 4px; background: var(--surface2); border-radius: 2px; overflow: hidden; margin: 0 8px 0 0; }
+    .prio-bar { height: 100%; border-radius: 2px; }
+    .prio-score { font-size: 10px; color: var(--muted); min-width: 36px; text-align: right; }
+    .opt-card {
+      background: linear-gradient(135deg, #00b89412, #0d2137);
+      border: 1px solid #00b89440; border-radius: 10px; padding: 14px;
+      margin-top: 16px;
+    }
+    .opt-headline { font-size: 13px; color: #b2c8e0; line-height: 1.6; }
+    .opt-big { font-family: 'Syne', sans-serif; font-size: 22px; font-weight: 800; color: var(--accent); }
+    .opt-proj { font-size: 11px; color: var(--muted); margin-top: 4px; }
+    .enc { font-size: 11px; color: var(--accent3); font-style: italic; margin-top: 12px; line-height: 1.6; }
+    .miss { font-size: 13px; color: var(--danger); line-height: 1.6; background: #e1700510; border: 1px solid #e1705530; border-radius: 8px; padding: 12px; }
+
+    /* CONFIG FORM */
+    #cfg-form { width: 100%; max-width: 420px; margin-top: 16px; }
+    .cfg-field { margin-bottom: 12px; }
+    .cfg-field label { display: block; font-size: 11px; color: var(--muted); font-weight: 600; letter-spacing: 1px; text-transform: uppercase; margin-bottom: 6px; }
+    .cfg-field input {
+      width: 100%; background: var(--surface2); border: 1px solid var(--border); border-radius: 10px;
+      color: #e0f0ff; padding: 12px 14px; font-family: 'DM Sans', sans-serif; font-size: 16px; font-weight: 600;
+      outline: none; transition: border-color 0.2s; -webkit-appearance: none;
+    }
+    .cfg-field input:focus { border-color: var(--accent); }
+    #back-btn {
+      width: 100%; max-width: 420px; padding: 14px;
+      background: transparent; border: 1px solid var(--border); border-radius: 10px;
+      color: var(--muted); font-family: 'DM Sans', sans-serif; font-size: 13px; font-weight: 600;
+      cursor: pointer; margin-top: 12px;
+      -webkit-tap-highlight-color: transparent;
+    }
+  </style>
+</head>
+<body>
+
+<div class="glow glow-1"></div>
+<div class="glow glow-2"></div>
+
+<!-- SHARE HANDLER (affiché quand Pronote partage vers la PWA) -->
+<div id="share-handler">
+  <h2>Pronote <span style="color:var(--accent)">+</span></h2>
+  <p id="sh-status">Analyse de ta page Pronote…</p>
+  <div id="results" style="display:none"></div>
+  <div id="cfg-form" style="display:none">
+    <div class="cfg-field">
+      <label>Ton prénom</label>
+      <input type="text" id="cfg-prenom" placeholder="ex : Léo" maxlength="20">
+    </div>
+    <div class="cfg-field">
+      <label>Objectif (/20)</label>
+      <input type="number" id="cfg-cible" min="0" max="20" step="0.5" value="15">
+    </div>
+  </div>
+  <button id="back-btn" onclick="document.getElementById('share-handler').classList.remove('active'); document.getElementById('results').style.display='none';">← Retour</button>
+</div>
+
+<!-- LANDING PAGE -->
+<nav>
+  <div class="wrap">
+    <div class="nav-logo">PRONOTE<span>+</span></div>
+    <div class="nav-badge">v7.1 — GRATUIT</div>
+  </div>
+</nav>
+
+<main class="wrap">
+  <section class="hero">
+    <div class="hero-tag">📚 Outil pour collégiens & lycéens</div>
+    <h1>Ta <em>vraie</em><br>moyenne.</h1>
+    <p class="hero-sub">Calcul automatique, <strong>priorités intelligentes</strong>, objectif personnalisé. Fonctionne sur PC et directement depuis l'app Pronote sur mobile.</p>
+  </section>
+
+  <div class="features">
+    <div class="feat-card">
+      <div class="feat-icon">📊</div>
+      <div class="feat-title">Moyenne réelle</div>
+      <div class="feat-desc">Calcul exact depuis ta page Pronote, avec toutes les matières.</div>
+    </div>
+    <div class="feat-card">
+      <div class="feat-icon">🎯</div>
+      <div class="feat-title">Priorités intelligentes</div>
+      <div class="feat-desc">Les matières où un 20/20 a le plus d'impact sur ta moyenne générale.</div>
+    </div>
+    <div class="feat-card">
+      <div class="feat-icon">🚀</div>
+      <div class="feat-title">Objectif personnalisé</div>
+      <div class="feat-desc">Quelle note, combien de fois pour atteindre ta cible.</div>
+    </div>
+    <div class="feat-card">
+      <div class="feat-icon">💜</div>
+      <div class="feat-title">Encouragements</div>
+      <div class="feat-desc">Un message motivant à chaque calcul. Parce que tu le mérites.</div>
+    </div>
+  </div>
+
+  <!-- INSTALL -->
+  <section class="install-section">
+    <div class="section-title">Installation</div>
+
+    <div class="tabs">
+      <button class="tab-btn active" onclick="switchTab('pc')">💻 PC / Mac</button>
+      <button class="tab-btn" onclick="switchTab('ios')">🍎 iPhone / iPad</button>
+      <button class="tab-btn" onclick="switchTab('android')">🤖 Android</button>
+    </div>
+
+    <!-- PC -->
+    <div class="tab-pane active" id="tab-pc">
+      <div class="install-card">
+        <div class="step">
+          <div class="step-num">1</div>
+          <div class="step-body">
+            <div class="step-title">Affiche ta barre de favoris</div>
+            <div class="step-desc">Chrome / Firefox / Edge : <code>Ctrl+Shift+B</code></div>
+          </div>
+        </div>
+        <div class="step">
+          <div class="step-num">2</div>
+          <div class="step-body">
+            <div class="step-title">Glisse ce bouton dans tes favoris</div>
+            <div class="step-desc">Clique-glisse directement sur ta barre de favoris.</div>
+            <div class="bm-wrap">
+              <a id="bm-btn" href="javascript:void(0)" title="Glisse-moi dans tes favoris">⭐ Pronote Plus</a>
+              <span class="bm-hint">← glisser sur la barre</span>
+            </div>
+            <div class="step-desc" style="margin-top:8px">Astuce : si le glisser-déposer ne marche pas, fais clic droit → <em>"Ajouter aux favoris"</em>.</div>
+          </div>
+        </div>
+        <div class="step">
+          <div class="step-num">3</div>
+          <div class="step-body">
+            <div class="step-title">Sur Pronote, va sur "Notes → Par matière"</div>
+            <div class="step-desc">Puis clique sur le favori <strong>Pronote Plus</strong> dans ta barre.</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- iOS -->
+    <div class="tab-pane" id="tab-ios">
+      <div class="install-card">
+        <div class="step">
+          <div class="step-num">1</div>
+          <div class="step-body">
+            <div class="step-title">Installe Pronote Plus sur ton écran d'accueil</div>
+            <div class="step-desc">Dans Safari, appuie sur le bouton Partager (carré avec une flèche) → <strong>"Sur l'écran d'accueil"</strong>. L'app s'installe en 2 secondes, sans App Store.</div>
+          </div>
+        </div>
+        <button id="install-btn">📲 Installer Pronote Plus</button>
+        <div class="step" style="margin-top:20px">
+          <div class="step-num">2</div>
+          <div class="step-body">
+            <div class="step-title">Ouvre Pronote dans Safari</div>
+            <div class="step-desc">Va sur <strong>Notes → Par matière</strong> dans l'app web Pronote (pronote.net).</div>
+          </div>
+        </div>
+        <div class="step">
+          <div class="step-num">3</div>
+          <div class="step-body">
+            <div class="step-title">Partage la page vers Pronote Plus</div>
+            <div class="share-visual">
+              <div class="share-icon">📤</div>
+              <div class="share-text">Appuie sur <strong>Partager</strong> → fais défiler → <strong>"Pronote Plus"</strong>. Le calcul se lance automatiquement.</div>
+            </div>
+          </div>
+        </div>
+        <div class="alert">
+          💡 <span><strong>Conseil :</strong> La première fois, configure ton prénom et ton objectif de moyenne dans l'app. Ils sont mémorisés pour toujours.</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Android -->
+    <div class="tab-pane" id="tab-android">
+      <div class="install-card">
+        <div class="step">
+          <div class="step-num">1</div>
+          <div class="step-body">
+            <div class="step-title">Installe Pronote Plus</div>
+            <div class="step-desc">Dans Chrome, appuie sur le menu ⋮ → <strong>"Ajouter à l'écran d'accueil"</strong>. Ou clique sur le bouton ci-dessous si Chrome le propose.</div>
+          </div>
+        </div>
+        <button id="install-btn-android" class="visible" style="display:none; width:100%; padding:14px; background:var(--accent); color:#0f1923; font-family:'DM Sans',sans-serif; font-size:14px; font-weight:700; border:none; border-radius:10px; cursor:pointer; margin-top:8px; -webkit-tap-highlight-color:transparent;">📲 Installer Pronote Plus</button>
+        <div class="step" style="margin-top:20px">
+          <div class="step-num">2</div>
+          <div class="step-body">
+            <div class="step-title">Ouvre Pronote dans Chrome</div>
+            <div class="step-desc">Va sur <strong>Notes → Par matière</strong> dans le site Pronote.</div>
+          </div>
+        </div>
+        <div class="step">
+          <div class="step-num">3</div>
+          <div class="step-body">
+            <div class="step-title">Partage vers Pronote Plus</div>
+            <div class="share-visual">
+              <div class="share-icon">📤</div>
+              <div class="share-text">Appuie sur le menu ⋮ → <strong>Partager</strong> → <strong>"Pronote Plus"</strong>. Les résultats s'affichent instantanément.</div>
+            </div>
+          </div>
+        </div>
+        <div class="alert">
+          💡 <span>Le bookmarklet PC <strong>fonctionne aussi</strong> dans Chrome Android via les favoris.</span>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- FAQ -->
+  <section class="faq">
+    <div class="section-title">Questions fréquentes</div>
+    <div class="faq-item">
+      <button class="faq-q" onclick="toggleFaq(this)">Mes données sont-elles envoyées quelque part ? <span class="icon">+</span></button>
+      <div class="faq-a">Non. Tout le calcul se fait dans ton navigateur, localement. Rien n'est envoyé à aucun serveur. Tes notes ne quittent jamais ton appareil.</div>
+    </div>
+    <div class="faq-item">
+      <button class="faq-q" onclick="toggleFaq(this)">Pourquoi ça ne détecte pas mes moyennes ? <span class="icon">+</span></button>
+      <div class="faq-a">Tu dois être sur la page "Notes → Par matière" de Pronote, pas sur la page d'accueil. Si ça ne fonctionne toujours pas, essaie de recharger la page Pronote puis de relancer.</div>
+    </div>
+    <div class="faq-item">
+      <button class="faq-q" onclick="toggleFaq(this)">Comment ça calcule les priorités ? <span class="icon">+</span></button>
+      <div class="faq-a">Pour chaque matière, on simule l'ajout d'un 20/20 et on calcule l'impact sur ta moyenne générale. Une matière à 2/20 te rapporte bien plus qu'une matière déjà à 18/20.</div>
+    </div>
+    <div class="faq-item">
+      <button class="faq-q" onclick="toggleFaq(this)">Ça marche avec les coefficients ? <span class="icon">+</span></button>
+      <div class="faq-a">Le calcul utilise les moyennes par matière telles qu'affichées par Pronote (qui intègre déjà les coefficients des évaluations). Les coefficients inter-matières ne sont pas encore supportés.</div>
+    </div>
+    <div class="faq-item">
+      <button class="faq-q" onclick="toggleFaq(this)">Comment fermer le widget ? <span class="icon">+</span></button>
+      <div class="faq-a">Sur PC, clique sur la barre du haut du widget ou relance le bookmarklet. Sur mobile, utilise le bouton retour ou ferme simplement l'app.</div>
+    </div>
+  </section>
+</main>
+
+<footer>
+  <div class="wrap">
+    Pronote Plus — Open-source, non affilié à Index Education. Fait avec 💙 pour les élèves.
+  </div>
+</footer>
+
+<script>
+// ============================================================
+// BOOKMARKLET CODE — injecté dans le href du bouton
+// ============================================================
+(function buildBookmarklet() {
+  const code = `(function(){var CFG_KEY='pp7_cfg';var SCORES_KEY='pp7_scores';var defaultCfg={prenom:'',cible:15};function getCfg(){try{return Object.assign({},defaultCfg,JSON.parse(localStorage.getItem(CFG_KEY)))}catch(e){return Object.assign({},defaultCfg)}}function saveCfg(c){localStorage.setItem(CFG_KEY,JSON.stringify(c))}function getScores(){try{return JSON.parse(localStorage.getItem(SCORES_KEY))||[]}catch(e){return[]}}function saveScores(s){localStorage.setItem(SCORES_KEY,JSON.stringify(s))}var ENCS=["Chaque effort compte. Continue comme \u00e7a ! \uD83D\uDD25","Les grands r\u00e9sultats viennent des petits efforts. Go ! \uD83D\uDE80","Tu es plus capable que tu ne le crois. Fonce ! \uD83D\uDCAA","Accroche-toi, le travail paie toujours ! \u26A1","M\u00eame les meilleurs ont eu des doutes. Continue ! \uD83C\uDF1F","Un effort \u00e0 la fois, et tu y seras. Courage ! \uD83C\uDFAF","Tu as d\u00e9j\u00e0 fait du chemin. Pas question de l\u00e2cher ! \uD83C\uDFC6","Chaque devoir rendu est une victoire. Bravo ! \uD83C\uDF96\uFE0F","Crois en toi autant que tes profs croient en toi ! \u2728","La r\u00e9gularit\u00e9 bat le talent. Reste constant ! \uD83D\uDCA1"];function enc(){return ENCS[Math.floor(Math.random()*ENCS.length)]}function getText(el){if(!el)return'';if(typeof el.innerText==='string'&&el.innerText.trim())return el.innerText.trim();return(el.textContent||'').replace(/\s+/g,' ').trim()}function getAllDocs(){var docs=[];try{docs.push(document)}catch(e){}try{Array.from(window.frames).forEach(function(f){try{if(f.document&&f.document.body)docs.push(f.document)}catch(e){}})}catch(e){}return docs}function extraireDuDoc(doc){var res=[];var vus=new Set();function add(nom,val){if(!nom||nom.length<2||val<0||val>20)return;if(/groupe|classe|\u00e9l\u00e8ve|moy\.|évaluation/i.test(nom))return;var k=nom.slice(0,30)+'-'+val;if(vus.has(k))return;vus.add(k);res.push({matiere:nom.trim(),moyenne:val})}try{doc.querySelectorAll('*').forEach(function(el){if(el.children.length>0)return;var t=(el.textContent||'').trim();if(!/^\d{1,2},\d{2}$/.test(t))return;var val=parseFloat(t.replace(',','.'));if(val<0||val>20)return;var ancestor=el.parentElement;for(var i=0;i<6&&ancestor;i++){var txt=getText(ancestor);var nom=txt.replace(t,'').replace(/\s+/g,' ').trim().split('\n')[0].trim();if(nom.length>3&&/^[A-Z\u00C0-\u00DC]/.test(nom)&&nom.length<80&&!/^\d/.test(nom)){add(nom,val);break}ancestor=ancestor.parentElement}})}catch(e){}if(res.length===0){try{var rawText=getText(doc.body);var lignes=rawText.split('\n').map(function(s){return s.trim()}).filter(Boolean);for(var i=0;i<lignes.length-1;i++){var next=lignes[i+1];if(!/^\d{1,2},\d{2}$/.test(next))continue;var nom=lignes[i];if(nom.length>3&&/^[A-Z\u00C0-\u00DC]/.test(nom)&&!/groupe|classe/i.test(nom)){add(nom,parseFloat(next.replace(',','.')));i++}}}catch(e){}}if(res.length===0){try{var rows=doc.querySelectorAll('tr');rows.forEach(function(row){var cells=Array.from(row.querySelectorAll('td,th'));cells.forEach(function(cell,idx){var t=(cell.textContent||'').trim();if(!/^\d{1,2},\d{2}$/.test(t))return;var val=parseFloat(t.replace(',','.'));if(val<0||val>20)return;[cells[idx-1],cells[idx+1]].forEach(function(c){if(!c)return;var nom=(c.textContent||'').trim().split('\n')[0].trim();if(nom.length>3&&/^[A-Z\u00C0-\u00DC]/.test(nom)&&nom.length<80)add(nom,val)})})})}catch(e){}}if(res.length===0){try{var html=doc.body.innerHTML||'';var pattern=/([A-Z\u00C0-\u00DC][A-Za-z\u00C0-\u00FF\s\-]{2,40})[^<]{0,60}>(\d{1,2},\d{2})</g;var m;while((m=pattern.exec(html))!==null){var nom=m[1].trim();var val=parseFloat(m[2].replace(',','.'));if(nom.length>3&&val>=0&&val<=20&&!/groupe|classe/i.test(nom))add(nom,val)}}catch(e){}}return res}function getMatieres(){var found=[];getAllDocs().forEach(function(doc){if(found.length>0)return;found=extraireDuDoc(doc)});if(found.length>0){saveScores(found);return found}return getScores()}function calculerImpacts(matieres,moyGen){return matieres.map(function(m){var nouvMoy=(m.moyenne+20)/2;var nouvGen=(moyGen*matieres.length-m.moyenne+nouvMoy)/matieres.length;var gain=nouvGen-moyGen;return Object.assign({},m,{gain:gain.toFixed(3),ecart:(moyGen-m.moyenne).toFixed(2),priorite:gain})}).sort(function(a,b){return b.priorite-a.priorite})}function calcOpt(moy,cible,nb){if(moy>=cible)return{dejaThere:true};for(var n=1;n<=20;n++){for(var note=20;note>=Math.ceil(moy)+1;note-=0.5){if((moy*nb+note*n)/(nb+n)>=cible)return{note:note,n:n,projection:((moy*nb+note*n)/(nb+n)).toFixed(2)}}}return{note:20,n:20,projection:'~'+cible}}function renderPrios(impacts){return impacts.slice(0,3).map(function(m,i){var badges=['\uD83E\uDD47','\uD83E\uDD48','\uD83E\uDD49'];var bw=Math.round(parseFloat(m.gain)/parseFloat(impacts[0].gain)*100);var col=i===0?'#00b894':i===1?'#74b9ff':'#a29bfe';return'<div style="margin-bottom:10px"><div style="display:flex;justify-content:space-between;margin-bottom:4px"><span style="font-size:11px;color:#cdd6f4;font-weight:600">'+badges[i]+' '+m.matiere+'</span><span style="font-size:10px;color:'+col+';font-weight:700">+'+m.gain+' pt</span></div><div style="display:flex;align-items:center;gap:6px"><div style="flex:1;height:4px;background:#1e3a5f;border-radius:2px;overflow:hidden"><div style="width:'+bw+'%;height:100%;background:'+col+';border-radius:2px"></div></div><span style="font-size:9px;color:#4a6fa5;min-width:36px;text-align:right">'+m.moyenne+'/20</span></div><div style="font-size:9px;color:#4a6fa5;margin-top:2px">'+(m.ecart>0?m.ecart+' pts sous ta moyenne \u2192 priorit\u00e9 !':'Au-dessus de ta moyenne')+'</div></div>'}).join('')}function buildWidget(){var old=document.getElementById('pp7');if(old){old.remove();return}var cfg=getCfg();var matieres=getMatieres();var moyGen=matieres.length?matieres.reduce(function(s,m){return s+m.moyenne},0)/matieres.length:null;var impacts=moyGen!==null?calculerImpacts(matieres,moyGen):[];var opt=moyGen!==null?calcOpt(moyGen,cfg.cible,matieres.length):null;var isMobile=/Android|iPhone|iPad|iPod/i.test(navigator.userAgent)||window.innerWidth<600;var W=document.createElement('div');W.id='pp7';var st=document.createElement('style');st.textContent='#pp7{position:fixed;'+(isMobile?'bottom:0;left:0;right:0;border-radius:20px 20px 0 0;max-height:85vh;overflow-y:auto;':'bottom:20px;right:20px;width:320px;border-radius:16px;max-height:90vh;overflow-y:auto;')+'background:#0f1923;border:1px solid #1e3a5f;font-family:\'Segoe UI\',system-ui,sans-serif;box-shadow:0 -8px 40px rgba(0,0,0,.8);z-index:2147483647;color:#cdd6f4;-webkit-overflow-scrolling:touch}#pp7 *{box-sizing:border-box}#pp7-hd{display:flex;align-items:center;justify-content:space-between;padding:14px 18px;background:linear-gradient(135deg,#0d2137,#0f1923);border-bottom:1px solid #1e3a5f;cursor:pointer;user-select:none;position:sticky;top:0;border-radius:'+(isMobile?'20px 20px 0 0':'16px 16px 0 0')+'}#pp7-hd .logo{font-size:12px;font-weight:800;letter-spacing:2px;color:#00b894}#pp7-hd .close{font-size:18px;color:#4a6fa5}#pp7-bd{padding:16px 18px}.pp-s{margin-bottom:18px}.pp-l{font-size:9px;font-weight:700;letter-spacing:2.5px;color:#4a6fa5;text-transform:uppercase;margin-bottom:8px}.pp-v{font-size:48px;font-weight:800;color:#00b894;line-height:1;letter-spacing:-2px}.pp-miss{font-size:13px;color:#e17055;line-height:1.6;background:#e1700510;border:1px solid #e1705530;border-radius:8px;padding:10px 12px}.pp-div{height:1px;background:#1e3a5f;margin:16px 0}.pp-oc{background:linear-gradient(135deg,#00b89412,#0d2137);border:1px solid #00b89440;border-radius:10px;padding:12px 14px}.pp-ob{font-size:20px;font-weight:800;color:#00b894}.pp-enc{font-size:11px;color:#a29bfe;font-style:italic;margin-top:10px;line-height:1.6}.pp-btn{display:block;width:100%;padding:10px;background:transparent;border:1px solid #1e3a5f;border-radius:8px;color:#4a6fa5;font-family:inherit;font-size:12px;font-weight:600;cursor:pointer;margin-top:8px;-webkit-tap-highlight-color:transparent}.pp-stg{display:none}.pp-stg.open{display:block}.pp-fi{margin-bottom:12px}.pp-fi label{display:block;font-size:11px;color:#4a6fa5;margin-bottom:5px;font-weight:600;letter-spacing:1px;text-transform:uppercase}.pp-fi input{width:100%;background:#0d2137;border:1px solid #1e3a5f;border-radius:8px;color:#e0f0ff;padding:10px 12px;font-family:inherit;font-size:15px;font-weight:600;outline:none;-webkit-appearance:none}.pp-fi input:focus{border-color:#00b894}.pp-sv{display:block;width:100%;padding:12px;background:#00b894;border:none;border-radius:8px;color:#0f1923;font-family:inherit;font-size:12px;font-weight:800;cursor:pointer;letter-spacing:1px;text-transform:uppercase;-webkit-tap-highlight-color:transparent}';var projH='';if(opt){projH=opt.dejaThere?'<div class="pp-oc"><div style="font-size:13px;color:#b2c8e0">\uD83C\uDFC6 Objectif <strong style="color:#74b9ff">'+cfg.cible+'/20</strong> d\u00e9j\u00e0 atteint !</div></div>':'<div class="pp-oc"><div style="font-size:13px;color:#b2c8e0">Pour passer \u00e0 <strong style="color:#74b9ff">'+cfg.cible+'/20</strong> :</div><div style="margin-top:6px">Avoir <span class="pp-ob">'+opt.note+'/20</span> encore <span class="pp-ob">'+opt.n+'\u00d7</span></div><div style="font-size:11px;color:#4a6fa5;margin-top:4px">\u2192 Projection : '+opt.projection+'/20</div></div>'}};W.innerHTML='<div id="pp7-hd"><span class="logo">PRONOTE +</span><span class="close">\u00d7</span></div><div id="pp7-bd"><div class="pp-s"><div class="pp-l">Moyenne g\u00e9n\u00e9rale</div>'+(moyGen!==null?'<div style="display:flex;align-items:baseline;gap:6px"><span class="pp-v">'+moyGen.toFixed(2)+'</span><span style="font-size:18px;color:#4a6fa5">/ 20</span><span style="font-size:11px;color:#4a6fa5;align-self:flex-end;padding-bottom:6px">'+matieres.length+' mat.</span></div>':'<div class="pp-miss">Aucune moyenne trouv\u00e9e.<br>\u2192 Va sur <strong>Notes \u2192 Par mati\u00e8re</strong><br>\u2192 Relance le bookmarklet</div>')+'</div>'+(moyGen!==null?'<div class="pp-s"><div class="pp-l">Objectif <strong style="color:#74b9ff;letter-spacing:0">'+cfg.cible+'/20</strong></div>'+projH+'<div class="pp-enc">'+enc()+'</div></div>':'')+(impacts.length>0?'<div class="pp-s"><div class="pp-l">\uD83C\uDFAF O\u00f9 bosser en priorit\u00e9</div><div style="font-size:10px;color:#4a6fa5;margin-bottom:10px">Impact d\'un 20/20 sur ta moyenne g\u00e9n\u00e9rale</div>'+renderPrios(impacts)+'<div style="font-size:10px;color:#4a6fa5;line-height:1.5;margin-top:4px;padding:8px;background:#0d2137;border-radius:6px">\uD83D\uDCA1 Une mati\u00e8re o\u00f9 tu as 2/20 te rapporte <strong style="color:#00b894">bien plus</strong> qu\'une \u00e0 18/20.</div></div>':'')+'<div class="pp-div"></div><button class="pp-btn" id="pp7-sg">\u2699 Param\u00e8tres</button><div class="pp-stg" id="pp7-stg"><div style="height:14px"></div><div class="pp-fi"><label>Ton pr\u00e9nom</label><input type="text" id="pp7-p" placeholder="ex : L\u00e9o" value="'+cfg.prenom+'" maxlength="20"></div><div class="pp-fi"><label>Moyenne \u00e0 atteindre (/20)</label><input type="number" id="pp7-c" min="0" max="20" step="0.5" value="'+cfg.cible+'"></div><button class="pp-sv" id="pp7-sv">Enregistrer</button></div>'+(isMobile?'<div style="height:20px"></div>':'')+'</div>';W.prepend(st);document.body.appendChild(W);W.querySelector('#pp7-hd').addEventListener('click',function(){W.remove()});W.querySelector('#pp7-sg').addEventListener('click',function(e){e.stopPropagation();W.querySelector('#pp7-stg').classList.toggle('open')});W.querySelector('#pp7-sv').addEventListener('click',function(e){e.stopPropagation();var p=W.querySelector('#pp7-p').value.trim();var c=parseFloat(W.querySelector('#pp7-c').value);if(isNaN(c)||c<0||c>20){alert('Moyenne entre 0 et 20 !');return}saveCfg({prenom:p,cible:c});W.remove();buildWidget()});W.querySelector('#pp7-bd').addEventListener('click',function(e){e.stopPropagation()})}buildWidget()})()`;
+  document.getElementById('bm-btn').href = 'javascript:' + encodeURIComponent(code).replace(/%20/g, ' ');
+})();
+
+// ============================================================
+// TABS
+// ============================================================
+function switchTab(id) {
+  document.querySelectorAll('.tab-pane').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+  document.getElementById('tab-' + id).classList.add('active');
+  event.target.classList.add('active');
+}
+
+// ============================================================
+// FAQ
+// ============================================================
+function toggleFaq(btn) {
+  const item = btn.closest('.faq-item');
+  item.classList.toggle('open');
+}
+
+// ============================================================
+// PWA INSTALL
+// ============================================================
+let deferredPrompt;
+window.addEventListener('beforeinstallprompt', e => {
+  e.preventDefault();
+  deferredPrompt = e;
+  document.getElementById('install-btn').classList.add('visible');
+  const btnA = document.getElementById('install-btn-android');
+  if (btnA) btnA.style.display = 'block';
+});
+document.getElementById('install-btn').addEventListener('click', async () => {
+  if (deferredPrompt) { deferredPrompt.prompt(); await deferredPrompt.userChoice; deferredPrompt = null; }
+});
+const btnA = document.getElementById('install-btn-android');
+if (btnA) btnA.addEventListener('click', async () => {
+  if (deferredPrompt) { deferredPrompt.prompt(); await deferredPrompt.userChoice; deferredPrompt = null; }
+});
+
+// ============================================================
+// SERVICE WORKER
+// ============================================================
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('sw.js').catch(() => {});
+}
+
+// ============================================================
+// WEB SHARE TARGET — reçoit la page Pronote partagée
+// ============================================================
+const ENCS = [
+  "Chaque effort compte. Continue comme ça ! 🔥",
+  "Les grands résultats viennent des petits efforts. Go ! 🚀",
+  "Tu es plus capable que tu ne le crois. Fonce ! 💪",
+  "Accroche-toi, le travail paie toujours ! ⚡",
+  "Même les meilleurs ont eu des doutes. Continue ! 🌟",
+  "Un effort à la fois, et tu y seras. Courage ! 🎯",
+  "Tu as déjà fait du chemin. Pas question de lâcher ! 🏆",
+  "Chaque devoir rendu est une victoire. Bravo ! 🎖️",
+  "Crois en toi autant que tes profs croient en toi ! ✨",
+  "La régularité bat le talent. Reste constant ! 💡",
+];
+function enc() { return ENCS[Math.floor(Math.random() * ENCS.length)]; }
+
+function getText(el) {
+  if (!el) return '';
+  if (typeof el.innerText === 'string' && el.innerText.trim()) return el.innerText.trim();
+  return (el.textContent || '').replace(/\s+/g, ' ').trim();
+}
+
+function extraireDepuisTexte(rawText) {
+  const res = [];
+  const vus = new Set();
+  function add(nom, val) {
+    if (!nom || nom.length < 2 || val < 0 || val > 20) return;
+    if (/groupe|classe|élève|moy\.|évaluation/i.test(nom)) return;
+    const k = nom.slice(0, 30) + '-' + val;
+    if (vus.has(k)) return;
+    vus.add(k);
+    res.push({ matiere: nom.trim(), moyenne: val });
+  }
+  // Méthode lignes adjacentes
+  const lignes = rawText.split('\n').map(s => s.trim()).filter(Boolean);
+  for (let i = 0; i < lignes.length - 1; i++) {
+    const next = lignes[i + 1];
+    if (!/^\d{1,2},\d{2}$/.test(next)) continue;
+    const nom = lignes[i];
+    if (nom.length > 3 && /^[A-ZÀÂÄÉÈÊËÎÏÔÙÛÜ]/.test(nom) && !/groupe|classe/i.test(nom)) {
+      add(nom, parseFloat(next.replace(',', '.')));
+      i++;
+    }
+  }
+  // Méthode regex inline
+  if (res.length === 0) {
+    const pattern = /([A-ZÀÂÄÉÈÊËÎÏÔÙÛÜ][A-Za-zÀ-ÿ\s\-]{2,40})\s+(\d{1,2},\d{2})/g;
+    let m;
+    while ((m = pattern.exec(rawText)) !== null) {
+      const nom = m[1].trim();
+      const val = parseFloat(m[2].replace(',', '.'));
+      if (nom.length > 3 && val >= 0 && val <= 20 && !/groupe|classe/i.test(nom)) add(nom, val);
+    }
+  }
+  return res;
+}
+
+function calculerImpacts(matieres, moyGen) {
+  return matieres.map(m => {
+    const nouvMoy = (m.moyenne + 20) / 2;
+    const nouvGen = (moyGen * matieres.length - m.moyenne + nouvMoy) / matieres.length;
+    const gain = nouvGen - moyGen;
+    return { ...m, gain: gain.toFixed(3), ecart: (moyGen - m.moyenne).toFixed(2), priorite: gain };
+  }).sort((a, b) => b.priorite - a.priorite);
+}
+
+function calcOpt(moy, cible, nb) {
+  if (moy >= cible) return { dejaThere: true };
+  for (let n = 1; n <= 20; n++) {
+    for (let note = 20; note >= Math.ceil(moy) + 1; note -= 0.5) {
+      if ((moy * nb + note * n) / (nb + n) >= cible) return { note, n, projection: ((moy * nb + note * n) / (nb + n)).toFixed(2) };
+    }
+  }
+  return { note: 20, n: 20, projection: '~' + cible };
+}
+
+function getCfg() {
+  try { return { prenom: '', cible: 15, ...JSON.parse(localStorage.getItem('pp7_cfg')) }; }
+  catch { return { prenom: '', cible: 15 }; }
+}
+
+function renderResults(matieres) {
+  const cfg = getCfg();
+  // Préremplir le formulaire config
+  document.getElementById('cfg-prenom').value = cfg.prenom;
+  document.getElementById('cfg-cible').value = cfg.cible;
+
+  const el = document.getElementById('results');
+  if (!matieres.length) {
+    el.style.display = 'block';
+    el.innerHTML = `
+      <div class="res-hd"><span class="res-logo logo" style="font-family:'Syne',sans-serif;font-size:14px;font-weight:800;color:#00b894;letter-spacing:2px">PRONOTE +</span></div>
+      <div class="res-body">
+        <div class="miss">Aucune moyenne trouvée dans cette page.<br>→ Assure-toi d'être sur <strong>Notes → Par matière</strong> dans Pronote.</div>
+      </div>`;
+    document.getElementById('cfg-form').style.display = 'block';
+    return;
+  }
+  const moyGen = matieres.reduce((s, m) => s + m.moyenne, 0) / matieres.length;
+  const impacts = calculerImpacts(matieres, moyGen);
+  const opt = calcOpt(moyGen, cfg.cible, matieres.length);
+
+  const prios = impacts.slice(0, 3).map((m, i) => {
+    const badges = ['🥇', '🥈', '🥉'];
+    const bw = Math.round(parseFloat(m.gain) / parseFloat(impacts[0].gain) * 100);
+    const col = i === 0 ? '#00b894' : i === 1 ? '#74b9ff' : '#a29bfe';
+    return `<div class="prio-item">
+      <div class="prio-row">
+        <span class="prio-name">${badges[i]} ${m.matiere}</span>
+        <span class="prio-gain" style="color:${col}">+${m.gain} pt</span>
+      </div>
+      <div style="display:flex;align-items:center;gap:6px">
+        <div class="prio-bar-wrap"><div class="prio-bar" style="width:${bw}%;background:${col}"></div></div>
+        <span class="prio-score">${m.moyenne}/20</span>
+      </div>
+      <div style="font-size:9px;color:#4a6fa5;margin-top:2px">${m.ecart > 0 ? m.ecart + ' pts sous ta moyenne → priorité !' : 'Au-dessus de ta moyenne'}</div>
+    </div>`;
+  }).join('');
+
+  const optHtml = opt.dejaThere
+    ? `<div class="opt-card"><div class="opt-headline">🏆 Objectif <strong style="color:#74b9ff">${cfg.cible}/20</strong> déjà atteint !</div></div>`
+    : `<div class="opt-card">
+        <div class="opt-headline">Pour passer à <strong style="color:#74b9ff">${cfg.cible}/20</strong> :</div>
+        <div style="margin-top:6px">Avoir <span class="opt-big">${opt.note}/20</span> encore <span class="opt-big">${opt.n}×</span></div>
+        <div class="opt-proj">→ Projection : ${opt.projection}/20</div>
+       </div>`;
+
+  el.style.display = 'block';
+  el.innerHTML = `
+    <div class="res-hd">
+      <span style="font-family:'Syne',sans-serif;font-size:14px;font-weight:800;color:#00b894;letter-spacing:2px">PRONOTE +</span>
+      <span style="font-size:12px;color:#4a6fa5">${cfg.prenom ? 'Salut ' + cfg.prenom + ' 👋' : ''}</span>
+    </div>
+    <div class="res-body">
+      <div class="res-label">Moyenne générale</div>
+      <div class="res-big">
+        <span class="val">${moyGen.toFixed(2)}</span>
+        <span class="over">/ 20</span>
+        <span class="nb">${matieres.length} mat.</span>
+      </div>
+      <div class="res-divider"></div>
+      <div class="res-section-title">Objectif ${cfg.cible}/20</div>
+      ${optHtml}
+      <div class="enc">${enc()}</div>
+      <div class="res-divider"></div>
+      <div class="res-section-title">🎯 Où bosser en priorité</div>
+      ${prios}
+      <div style="font-size:10px;color:#4a6fa5;line-height:1.5;margin-top:8px;padding:8px;background:#0d2137;border-radius:6px">
+        💡 Une matière à 2/20 te rapporte <strong style="color:#00b894">bien plus</strong> qu'une à 18/20.
+      </div>
+    </div>`;
+
+  document.getElementById('cfg-form').style.display = 'block';
+
+  // Sauvegarder config si modifiée
+  document.getElementById('cfg-prenom').addEventListener('change', saveConfig);
+  document.getElementById('cfg-cible').addEventListener('change', saveConfig);
+}
+
+function saveConfig() {
+  const p = document.getElementById('cfg-prenom').value.trim();
+  const c = parseFloat(document.getElementById('cfg-cible').value);
+  if (!isNaN(c) && c >= 0 && c <= 20) {
+    localStorage.setItem('pp7_cfg', JSON.stringify({ prenom: p, cible: c }));
+  }
+}
+
+// Détection partage entrant (Web Share Target API)
+async function handleShareTarget() {
+  const params = new URLSearchParams(window.location.search);
+  const sharedText = params.get('text') || params.get('title') || params.get('url') || '';
+
+  // Si c'est une URL Pronote partagée, ou du texte partagé
+  if (params.has('text') || params.has('title') || params.has('url')) {
+    const sh = document.getElementById('share-handler');
+    sh.classList.add('active');
+    document.getElementById('sh-status').textContent = 'Analyse en cours…';
+
+    // Si c'est du texte brut (contenu copié)
+    let matieres = extraireDepuisTexte(sharedText);
+
+    // Si c'est une URL, on ne peut pas fetch (CORS), on affiche un message guidé
+    if (!matieres.length && sharedText.includes('pronote')) {
+      document.getElementById('sh-status').textContent = 'Page reçue — lecture des moyennes…';
+      // Tenter fetch du HTML (peut échouer CORS)
+      try {
+        const resp = await fetch(sharedText);
+        const html = await resp.text();
+        const parser = new DOMParser();
+        const doc = parser.parseFromString(html, 'text/html');
+        const rawText = getText(doc.body);
+        matieres = extraireDepuisTexte(rawText);
+      } catch(e) {}
+    }
+
+    document.getElementById('sh-status').textContent = matieres.length
+      ? `${matieres.length} matières trouvées ✓`
+      : 'Analyse terminée';
+
+    renderResults(matieres);
+
+    // Nettoyer l'URL
+    window.history.replaceState({}, '', window.location.pathname);
+  }
+}
+
+handleShareTarget();
+</script>
+</body>
+</html>
